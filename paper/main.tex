@@ -18,6 +18,7 @@
 \usepackage{hyperref}
 \usepackage{enumitem}
 \usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepackage{caption}
@@ -308,43 +309,51 @@ policy conditions are met.
 
 \begin{figure}[t]
 \centering
+\resizebox{\columnwidth}{!}{%
 \begin{tikzpicture}[
-  node distance=0.38cm,
-  box/.style={rectangle, draw=gray!60, fill=blue!6, rounded corners=3pt,
-              minimum width=3.0cm, minimum height=0.55cm,
-              font=\scriptsize\sffamily, align=center},
-  decision/.style={diamond, draw=gray!60, fill=orange!10, rounded corners=2pt,
-                   minimum width=1.8cm, minimum height=0.65cm,
-                   font=\scriptsize\sffamily, align=center, inner sep=1pt},
-  arrow/.style={->,>=stealth,thick,gray!70},
-  label/.style={font=\tiny\sffamily\color{gray!80}}
+  node distance=0.50cm,
+  box/.style={rectangle, draw=gray!55, fill=blue!7, rounded corners=4pt,
+              minimum width=3.4cm, minimum height=0.65cm,
+              font=\small\sffamily, align=center, text width=3.2cm},
+  gbox/.style={rectangle, draw=gray!55, fill=green!8, rounded corners=4pt,
+               minimum width=3.4cm, minimum height=0.65cm,
+               font=\small\sffamily, align=center, text width=3.2cm},
+  rbox/.style={rectangle, draw=gray!55, fill=red!7, rounded corners=4pt,
+               minimum width=2.8cm, minimum height=0.65cm,
+               font=\small\sffamily, align=center, text width=2.6cm},
+  dec/.style={diamond, draw=gray!55, fill=orange!12,
+              minimum width=2.2cm, minimum height=0.80cm,
+              font=\small\sffamily, align=center, inner sep=2pt},
+  arrow/.style={->,>=Stealth,semithick,gray!65},
+  lbl/.style={font=\footnotesize\sffamily\color{gray!60}}
 ]
-  \node[box] (ingest)   {File Ingestion};
-  \node[box, below=of ingest]  (scan)    {Static Scanner\\(Regex / Semgrep)};
-  \node[box, below=of scan]    (hook)    {Hook Detector\\(Consent Gap)};
-  \node[box, below=of hook]    (chain)   {Chain Tracer\\(Import Graph)};
-  \node[box, below=of chain]   (llm)     {LLM Auditor\\(opt-in)};
-  \node[box, below=of llm]     (reg)     {Registry Adapter\\(opt-in)};
-  \node[box, below=of reg]     (policy)  {Policy Engine};
-  \node[decision, below=0.4cm of policy] (dec) {PASS?};
-  \node[box, below=0.4cm of dec, fill=green!8]  (merkle)  {Merkle Tree\\(SHA-256)};
-  \node[box, below=of merkle, fill=green!8]  (sign)    {Ed25519 Signer};
-  \node[box, right=0.7cm of dec, fill=red!8]    (quar)    {Quarantine +\\Report};
+  \node[box]  (ingest) {File Ingestion};
+  \node[box,  below=of ingest]  (scan)   {Static Scanner\\[-2pt]{\scriptsize(Regex / Semgrep)}};
+  \node[box,  below=of scan]    (hook)   {Hook Detector\\[-2pt]{\scriptsize(Consent Gap)}};
+  \node[box,  below=of hook]    (chain)  {Chain Tracer\\[-2pt]{\scriptsize(Import Graph)}};
+  \node[box,  below=of chain]   (llm)    {LLM Auditor\\[-2pt]{\scriptsize(opt-in)}};
+  \node[box,  below=of llm]     (reg)    {Registry Adapter\\[-2pt]{\scriptsize(opt-in)}};
+  \node[box,  below=of reg]     (policy) {Policy Engine};
+  \node[dec,  below=0.55cm of policy]   (pass)   {PASS?};
+  \node[gbox, below=0.55cm of pass]     (merkle) {Merkle Tree (SHA-256)};
+  \node[gbox, below=of merkle]          (sign)   {Ed25519 Signer};
+  % Quarantine branch — placed well clear of the main pipeline
+  \node[rbox, right=2.0cm of pass]      (quar)   {Quarantine\\+ Report};
 
   \draw[arrow] (ingest) -- (scan);
-  \draw[arrow] (scan) -- (hook);
-  \draw[arrow] (hook) -- (chain);
-  \draw[arrow] (chain) -- (llm);
-  \draw[arrow] (llm) -- (reg);
-  \draw[arrow] (reg) -- (policy);
-  \draw[arrow] (policy) -- (dec);
-  \draw[arrow] (dec) -- node[label,right]{yes} (merkle);
-  \draw[arrow] (dec) -- node[label,above]{\,no} (quar);
+  \draw[arrow] (scan)   -- (hook);
+  \draw[arrow] (hook)   -- (chain);
+  \draw[arrow] (chain)  -- (llm);
+  \draw[arrow] (llm)    -- (reg);
+  \draw[arrow] (reg)    -- (policy);
+  \draw[arrow] (policy) -- (pass);
+  \draw[arrow] (pass)   -- node[lbl,right]{yes} (merkle);
   \draw[arrow] (merkle) -- (sign);
+  \draw[arrow] (pass.east) -- node[lbl,above]{no\,} (quar.west);
 \end{tikzpicture}
-\caption{STSS analysis pipeline. The Merkle and signing stages execute
-only when policy evaluation yields \textsc{pass} or
-\textsc{pass\_with\_warnings}.}
+}% end resizebox
+\caption{STSS analysis pipeline. Merkle and signing stages execute only
+when policy evaluation yields \textsc{pass} or \textsc{pass\_with\_warnings}.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -402,27 +411,35 @@ interface ScannerAdapter {
 \begin{table}[t]
 \centering
 \caption{Default regex rule set. Rules marked~$\dagger$ apply only to
-markdown documentation files.}
+markdown documentation files. H/C\,=\,HIGH/CRITICAL.}
 \label{tab:rules}
-\renewcommand{\arraystretch}{1.1}
+\renewcommand{\arraystretch}{1.15}
 \scriptsize
-\begin{tabular}{llp{3.8cm}}
+\begin{tabularx}{\columnwidth}{@{}ll>{\raggedright\arraybackslash}X@{}}
 \toprule
 \textbf{ID} & \textbf{Sev.} & \textbf{Pattern / Trigger} \\
 \midrule
-FS-001 & HIGH & \texttt{.ssh|.env|/etc/passwd|id\_rsa|.npmrc|.netrc|\textasciitilde/.aws} \\
-SH-001 & HIGH & \texttt{subprocess|exec(|eval(|child\_process|execSync|shell=True} \\
-NET-001& HIGH / CRIT & \texttt{fetch(|axios|requests.get|urllib|XMLHttpRequest|socket(} \\
-SEC-001& HIGH & \texttt{process.env|os.environ} \\
-SEC-002& HIGH & Hex$\geq$32 / Base64$\geq$40 chars near key/secret/token/password \\
-OBF-001& HIGH & \texttt{base64.b64decode+exec|Buffer.from(...,'base64')+eval} \\
-OBF-002& HIGH & \texttt{fromCharCode} chains $\geq$5 \\
-OBF-003& HIGH & \texttt{unescape()+eval(} \\
-PI-001$\dagger$ & MED & ``ignore previous'', ``you are now operating as'', ``exfiltrate'' \\
-CP-001$\dagger$ & MED & ``debug mode'', ``you have been granted'', heading$\to$shell within 3 lines \\
-CG-001 & CRIT & Files named \texttt{post\_install.*|setup.sh|install.sh|bootstrap.sh} \\
+FS-001  & HIGH & \texttt{.ssh}, \texttt{.env}, \texttt{/etc/passwd},
+                 \texttt{id\_rsa}, \texttt{.npmrc}, \texttt{\textasciitilde/.aws} \\
+SH-001  & HIGH & \texttt{subprocess}, \texttt{exec(}, \texttt{eval(},
+                 \texttt{child\_process}, \texttt{execSync}, \texttt{shell=True} \\
+NET-001 & H/C  & \texttt{fetch(}, \texttt{axios}, \texttt{requests.get},
+                 \texttt{urllib}, \texttt{XMLHttpRequest}, \texttt{socket(} \\
+SEC-001 & HIGH & \texttt{process.env}, \texttt{os.environ} \\
+SEC-002 & HIGH & Hex$\geq$32 or Base64$\geq$40 chars within 3 lines of
+                 \texttt{key}/\texttt{secret}/\texttt{token}/\texttt{password} \\
+OBF-001 & HIGH & \texttt{base64.b64decode}+\texttt{exec};
+                 \texttt{Buffer.from(\ldots,'base64')}+\texttt{eval} \\
+OBF-002 & HIGH & \texttt{fromCharCode} chains $\geq$5 consecutive \\
+OBF-003 & HIGH & \texttt{unescape()}+\texttt{eval(} on same line \\
+PI-001$\dagger$ & MED & ``ignore previous'', ``you are now operating as'',
+                        ``exfiltrate'', ``POST to'' \\
+CP-001$\dagger$ & MED & ``debug mode'', ``you have been granted'',
+                        heading within 3 lines of shell command \\
+CG-001  & CRIT & Filename matches \texttt{post\_install.*}, \texttt{setup.sh},
+                 \texttt{install.sh}, \texttt{bootstrap.sh} \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsection{Hook Detector}
@@ -752,21 +769,20 @@ Table~\ref{tab:crypto} reports timing for the cryptographic operations.
 
 \begin{table}[h]
 \centering
-\caption{Cryptographic operation timing (ms, $n=5$ runs).}
+\caption{Cryptographic operation timing in ms ($n=5$ runs per size class).
+  Verify time includes full Merkle recomputation from disk.}
 \label{tab:crypto}
 \renewcommand{\arraystretch}{1.1}
 \scriptsize
-\begin{tabular}{lrrrr}
+\begin{tabular}{@{}lrrr@{}}
 \toprule
 \textbf{Operation} & \textbf{Small} & \textbf{Medium} & \textbf{Large} \\
 \midrule
-Keygen (Ed25519)  & 0.43 & 0.43 & 0.43 \\
-Sign (ms)         & 1.15 & 1.57 & 1.66 \\
-Verify (ms)$^*$   & 3.54 & 16.32 & 55.44 \\
+Keygen (Ed25519) & 0.43 & 0.43 & 0.43 \\
+Sign             & 1.15 & 1.57 & 1.66 \\
+Verify           & 3.54 & 16.32 & 55.44 \\
 \bottomrule
 \end{tabular}
-\\[3pt]
-\raggedright\scriptsize $^*$Verify includes full Merkle recomputation from disk.
 \end{table}
 
 Ed25519 key generation takes a constant 0.43\,ms regardless of skill size.
