@@ -12,33 +12,37 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { z } from 'zod';
 import { which } from './utils.js';
 import type { Finding, Severity, Category } from './scanner/types.js';
 
 const execFileAsync = promisify(execFile);
 
-// ── Caterpillar JSON response types ────────────────────────────────────────
+// ── Caterpillar JSON response schema (Zod-validated) ──────────────────────
 
-interface CaterpillarFinding {
-  severity: string;
-  category: string;
-  title: string;
-  description: string;
-  evidence?: string;
-  recommendation?: string;
-}
+const CaterpillarFindingSchema = z.object({
+  severity: z.string(),
+  category: z.string(),
+  title: z.string(),
+  description: z.string(),
+  evidence: z.string().optional(),
+  recommendation: z.string().optional(),
+});
 
-interface CaterpillarResponse {
-  success: boolean;
-  data?: {
-    skill: string;
-    grade: string;
-    score: number;
-    findings: CaterpillarFinding[];
-    summary: string;
-  };
-  error?: { code: string; message: string };
-}
+const CaterpillarResponseSchema = z.object({
+  success: z.boolean(),
+  data: z.object({
+    skill: z.string(),
+    grade: z.string(),
+    score: z.number(),
+    findings: z.array(CaterpillarFindingSchema),
+    summary: z.string(),
+  }).optional(),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+  }).optional(),
+});
 
 // ── Mapping helpers ────────────────────────────────────────────────────────
 
@@ -99,7 +103,14 @@ export async function runCaterpillar(skillRoot: string): Promise<CaterpillarResu
       'ask', skillRoot, '--output', 'json',
     ], { timeout: 60_000 });
 
-    const response: CaterpillarResponse = JSON.parse(stdout);
+    const parsed = CaterpillarResponseSchema.safeParse(JSON.parse(stdout));
+
+    if (!parsed.success) {
+      console.warn('[stss] Caterpillar response validation failed:', parsed.error.message);
+      return { findings: [], mode };
+    }
+
+    const response = parsed.data;
 
     if (!response.success || !response.data?.findings) {
       return { findings: [], mode };
