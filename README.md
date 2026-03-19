@@ -96,6 +96,12 @@ STSS does not replace these tools — it layers on top of them and adds the AI-s
   │           └────────────┬────────────┘                 │
   │                        │                              │
   │           ┌────────────▼────────────┐                 │
+  │           │     Caterpillar        │  credential,    │
+  │           │  (auto-detected,       │  exfiltration,  │
+  │           │   free)                │  supply chain   │
+  │           └────────────┬────────────┘  findings       │
+  │                        │                              │
+  │           ┌────────────▼────────────┐                 │
   │           │      LLM Auditor        │  behavioral,    │
   │           │  (Claude API, opt-in)   │  contextual     │
   │           └────────────┬────────────┘  findings       │
@@ -137,7 +143,7 @@ STSS does not replace these tools — it layers on top of them and adds the AI-s
 | Package manager | pnpm workspaces |
 | Cryptography | `@noble/ed25519` (Ed25519), Node.js built-in `crypto` (SHA-256) |
 | Validation | Zod — all external data validated before use, no unsafe casts |
-| Static scanning | Custom RegexAdapter (zero deps) + SemgrepAdapter (optional) |
+| Static scanning | Custom RegexAdapter (zero deps) + SemgrepAdapter (optional) + [Caterpillar](https://github.com/alice-dot-io/caterpillar) (auto-detected) |
 | Policy | YAML — `js-yaml` + Zod schema, supports snake_case and camelCase |
 | Ignore rules | `ignore` package (gitignore syntax) |
 | Shell analysis | `shellcheck` (if on PATH) with regex fallback |
@@ -156,6 +162,7 @@ STSS does not replace these tools — it layers on top of them and adds the AI-s
 | `scanner/semgrep-adapter.ts` | Shells out to `semgrep`; parses JSON output; falls back to regex |
 | `hook-detector.ts` | Finds install scripts by name and manifest reference; runs shellcheck/regex on their contents |
 | `chain-tracer.ts` | Builds import graph (Python/JS/TS/Shell); reverse BFS from finding to entry point |
+| `caterpillar.ts` | Auto-detects [Caterpillar](https://github.com/alice-dot-io/caterpillar) on PATH; shells out for credential theft, exfiltration, and supply chain findings; offline or authenticated mode |
 | `policy.ts` | Zod-validated YAML loader; neverSign / requireApproval / autoApprove decision logic |
 | `llm-auditor.ts` | Calls Claude API with structured audit context; maps response to `Finding[]` |
 | `registry-adapters/skillssh.ts` | Fetches skills.sh audit page; 24h TTL cache; synthetic CRITICAL on malicious flag |

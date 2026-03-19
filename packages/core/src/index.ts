@@ -37,3 +37,6 @@ export type { VerificationResult, VerificationStatus, VerifyOptions } from './ve
 
 export { scan, scanAndSign, TOOL_VERSION, RULESET_VERSION } from './pipeline.js';
 export type { ScanOptions, ScanResult, ScanAndSignResult } from './pipeline.js';
+
+export { runCaterpillar, logCaterpillarStatus, logCaterpillarNotInstalled } from './caterpillar.js';
+export type { CaterpillarResult } from './caterpillar.js';

@@ -9,6 +9,7 @@ import { evaluatePolicy, DEFAULT_POLICY, type Policy, type PolicyResult } from '
 import { runLLMAudit, type LLMAuditContext, type LLMAdapter } from './llm-auditor.js';
 import { SkillsShAdapter, type SkillId } from './registry-adapters/skillssh.js';
 import { signAttestation, type SignedAttestation, type AttestationPayload } from './signer.js';
+import { runCaterpillar, logCaterpillarStatus, logCaterpillarNotInstalled, type CaterpillarResult } from './caterpillar.js';
 import type { Finding } from './scanner/types.js';
 import type { ChainFinding } from './chain-tracer.js';
 import type { MerkleResult } from './merkle.js';
@@ -31,6 +32,7 @@ export interface ScanResult {
   allFindings: Finding[];
   merkle: MerkleResult;
   policyResult: PolicyResult;
+  caterpillar: CaterpillarResult;
 }
 
 export interface ScanAndSignResult extends ScanResult {
@@ -72,7 +74,12 @@ export async function scan(skillRoot: string, options: ScanOptions = {}): Promis
   const allStaticFindings = [...staticFindings, ...hookFindings];
   const chainFindings = await traceImportChains(files, allStaticFindings, skillRoot);
 
-  // 5. LLM audit (opt-in)
+  // 5. Caterpillar scan (auto-detected)
+  const caterpillarResult = await runCaterpillar(skillRoot);
+  logCaterpillarStatus(caterpillarResult);
+  const caterpillarFindings = caterpillarResult.findings;
+
+  // 6. LLM audit (opt-in)
   let llmFindings: Finding[] = [];
   const skillMeta = await extractSkillMeta(skillRoot);
   const hasSignificantFindings = allStaticFindings.some(
@@ -96,7 +103,7 @@ export async function scan(skillRoot: string, options: ScanOptions = {}): Promis
     llmFindings = result.llmFindings;
   }
 
-  // 6. Registry audit (opt-in)
+  // 7. Registry audit (opt-in)
   let registryFindings: Finding[] = [];
   if (options.registryAudit && policy.registryAudit?.enabled && options.skillId) {
     for (const adapterName of policy.registryAudit.adapters) {
@@ -108,21 +115,22 @@ export async function scan(skillRoot: string, options: ScanOptions = {}): Promis
     }
   }
 
-  // 7. Merge all findings
+  // 8. Merge all findings
   const allFindings: Finding[] = [
     ...allStaticFindings,
     ...chainFindings,
+    ...caterpillarFindings,
     ...llmFindings,
     ...registryFindings,
   ];
 
-  // 8. Build Merkle tree
+  // 9. Build Merkle tree
   const merkle = await buildMerkleTree(files);
 
-  // 9. Evaluate policy
+  // 10. Evaluate policy
   const policyResult = evaluatePolicy(allFindings, policy);
 
-  return { files, findings: allStaticFindings, chainFindings, allFindings, merkle, policyResult };
+  return { files, findings: allStaticFindings, chainFindings, allFindings, merkle, policyResult, caterpillar: caterpillarResult };
 }
 
 async function buildFlaggedFiles(
@@ -177,6 +185,8 @@ export async function scanAndSign(
       registrySources: policy.registryAudit?.adapters ?? [],
       consentGapAnalysis: true,
       crossFileChainAnalysis: true,
+      caterpillarAuditPerformed: scanResult.caterpillar.mode !== 'skipped',
+      caterpillarMode: scanResult.caterpillar.mode,
     },
     policy: {
       name: options.policyName ?? 'default',

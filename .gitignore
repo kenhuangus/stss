@@ -9,3 +9,10 @@ keys/
 attestation.json
 tmp/
 .stss/registry-cache/
+
+# Testing (local only)
+testing.md
+test-fixtures/
+create-test-fixtures.sh
+run-integration-tests.sh
+findings.json
