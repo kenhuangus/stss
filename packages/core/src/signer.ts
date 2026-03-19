@@ -19,6 +19,8 @@ export interface AttestationPayload {
     registrySources: string[];
     consentGapAnalysis: boolean;
     crossFileChainAnalysis: boolean;
+    caterpillarAuditPerformed?: boolean;
+    caterpillarMode?: string;
   };
   policy: {
     name: string;
