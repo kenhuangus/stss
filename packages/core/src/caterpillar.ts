@@ -99,9 +99,22 @@ export async function runCaterpillar(skillRoot: string): Promise<CaterpillarResu
   const mode = await detectMode(bin);
 
   try {
-    const { stdout } = await execFileAsync(bin, [
-      'ask', skillRoot, '--output', 'json',
-    ], { timeout: 60_000 });
+    // Caterpillar exits 1 when a skill scores grade F — this is expected
+    // behavior, not an error. Capture stdout regardless of exit code.
+    let stdout: string;
+    try {
+      const result = await execFileAsync(bin, [
+        'ask', skillRoot, '--output', 'json',
+      ], { timeout: 60_000 });
+      stdout = result.stdout;
+    } catch (execErr: unknown) {
+      const err = execErr as { stdout?: string; code?: number };
+      if (err.stdout) {
+        stdout = err.stdout;
+      } else {
+        throw execErr;
+      }
+    }
 
     const parsed = CaterpillarResponseSchema.safeParse(JSON.parse(stdout));
 
